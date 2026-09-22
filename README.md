@@ -1,0 +1,123 @@
+# dcc-mcp-facade
+
+Reverse-proxy facade that exposes MCP servers behind a single host. Request flow:
+
+```
+client ──HTTPS──> nginx (TLS termination for *.mcp.data.bs.ch)
+                       │ proxy_pass (preserves full Host header)
+                       ▼
+                   Traefik (in-cluster reverse proxy)
+                       │ routes only Host("ogd.mcp.data.bs.ch")
+                       ▼
+                   ogd container (mcp-data-bs, MCP over streamable HTTP)
+```
+
+- **nginx** is external to this project: it terminates TLS and forwards every
+  `*.mcp.data.bs.ch` request to Traefik. See `nginx-example.conf`.
+- **Traefik** (in this compose) only routes the `ogd.mcp.data.bs.ch` hostname,
+  so other subdomains forwarded by nginx simply get no route (404).
+
+## Services
+
+| Service        | Container      | Image                          | Role                                             |
+|----------------|----------------|--------------------------------|--------------------------------------------------|
+| `ogd`          | `mcp-ogd`      | `ghcr.io/dcc-bs/mcp-data-bs`   | MCP server for the data.bs.ch open-data portal    |
+| `reverse-proxy`| `mcp-reverse-proxy` | `traefik:v3.6.1`          | Routes `ogd.mcp.data.bs.ch` to the ogd container |
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `compose.yml` | Defines the Traefik + ogd stack |
+| `nginx-example.conf` | Example nginx server blocks routing `*.mcp.data.bs.ch` to Traefik |
+| `.env.example` | Template for environment overrides |
+| `.env` | Local overrides (gitignored) |
+
+## Prerequisites
+
+- Docker Engine **v29+**, which dropped legacy Docker API versions (min 1.44).
+  This requires **Traefik v3.6.1+** — earlier Traefik versions hardcode the
+  Docker API at v1.24 and fail with `client version 1.24 is too old`.
+- Docker Compose v2.
+
+## Configuration
+
+Copy the example and adjust for your host:
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `DOCKER_SOCKET` | Path to the Docker daemon socket, used by Traefik's Docker provider. | `=/run/user/1000/docker.sock` (rootless) or `=/var/run/docker.sock` (rootful) |
+| `TRAEFIK_PORT` | Host port Traefik publishes on (used when reaching it via a host port). | `8001` |
+
+## Run
+
+```bash
+docker compose up -d
+```
+
+Verify:
+
+```bash
+docker compose ps            # both services Up, ogd healthy
+docker compose logs reverse-proxy
+```
+
+## Testing locally
+
+There is no local DNS/nginx, so emulate nginx by sending the `Host` header
+manually to Traefik's published port (`localhost:8001`):
+
+```bash
+# 1. Health check
+curl -H "Host: ogd.mcp.data.bs.ch" http://localhost:8001/healthz
+# {"status":"ok"}
+
+# 2. MCP initialize — the real test
+curl -N \
+  -H "Host: ogd.mcp.data.bs.ch" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"curl","version":"1.0"}}}' \
+  http://localhost:8001/mcp
+# SSE response with serverInfo (name: data.bs.ch)
+```
+
+## Production hostname / allowed hosts
+
+`MCP_ALLOWED_HOSTS` is the app's DNS-rebinding `Host`-header allowlist.
+nginx forwards a **bare** Host header (e.g. `Host: ogd.mcp.data.bs.ch`, no
+port). It must therefore be an **exact match**:
+
+```yaml
+MCP_ALLOWED_HOSTS: "ogd.mcp.data.bs.ch"   # correct for nginx in front
+```
+
+Do **not** use the `*:port` wildcard form (`ogd.mcp.data.bs.ch:*`) behind
+nginx: that pattern only matches a Host header that includes a port, so a bare
+host would be rejected with `421 Invalid Host header`.
+
+## Endpoints
+
+- `https://ogd.mcp.data.bs.ch/mcp` → MCP streamable HTTP endpoint
+- `https://ogd.mcp.data.bs.ch/healthz` → liveness check (`{"status":"ok"}`)
+- `http://localhost:<TRAEFIK_PORT>` → Traefik HTTP entrypoint (for local tests)
+
+## Troubleshooting
+
+**`client version 1.24 is too old`** — Docker v29 removed old API versions.
+Use Traefik `v3.6.1`+ (already pinned in this project).
+
+**`421 Invalid Host header`** — the `Host` header didn't match
+`MCP_ALLOWED_HOSTS`. Verify nginx forwards the bare host and that
+`MCP_ALLOWED_HOSTS` is the exact hostname (see above).
+
+**`404 page not found`** from Traefik — the hostname isn't routed. Only
+`ogd.mcp.data.bs.ch` is routed; confirm the `Host` header matches and that
+Traefik has picked up the router (`curl -H "Host: ogd.mcp.data.bs.ch" http://localhost:8001/healthz`).
+
+**Traefik cannot connect to the Docker daemon** — the `DOCKER_SOCKET` in
+`.env` is wrong. Run `docker context ls` to find the daemon socket path.

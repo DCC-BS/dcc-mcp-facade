@@ -1,0 +1,2 @@
+# Local environment overrides — contains machine-specific paths/UIDs
+.env

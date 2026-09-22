@@ -1,0 +1,46 @@
+networks:
+  mcp:
+    driver: bridge
+
+services:
+  reverse-proxy:
+    image: traefik:v3.6.1
+    container_name: mcp-reverse-proxy
+    restart: unless-stopped
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - "--providers.docker.endpoint=unix:///var/run/docker.sock"
+      - --entrypoints.http.address=:80
+    ports:
+    - "${TRAEFIK_PORT:-8001}:80"
+    networks:
+      - mcp
+    # Docker provider must reach the daemon. The socket path comes from .env
+    # (see .env.example) — it differs between rootless and rootful docker.
+    volumes:
+      - "${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock:ro"
+
+  ogd:
+    image: ghcr.io/dcc-bs/mcp-data-bs:latest
+    container_name: mcp-ogd
+    restart: unless-stopped
+    environment:
+      DATA_PORTAL_DOMAIN: data.bs.ch
+      PORT: "8000"
+      # nginx forwards the bare Host header (no :port), so use an exact match.
+      # A "*:port" wildcard only matches a Host WITH a port and would 421 here.
+      MCP_ALLOWED_HOSTS: "ogd.mcp.data.bs.ch"
+    networks:
+      - mcp
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz', timeout=5)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ogd.rule=Host(`ogd.mcp.data.bs.ch`)"
+      - "traefik.http.routers.ogd.entrypoints=http"
+      - "traefik.http.services.ogd.loadbalancer.server.port=8000"
