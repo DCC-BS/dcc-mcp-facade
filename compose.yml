@@ -44,3 +44,28 @@ services:
       - "traefik.http.routers.ogd.rule=Host(`ogd.mcp.data.bs.ch`)"
       - "traefik.http.routers.ogd.entrypoints=http"
       - "traefik.http.services.ogd.loadbalancer.server.port=8000"
+
+  grossrat:
+    # The Grosser Rat Basel-Stadt corpus: every business item, document and transcript since 1973.
+    # The databases are inside the image (~10 GB unpacked); it needs no volume and no model server.
+    image: ghcr.io/dcc-bs/grossrat-bs-mcp:latest
+    container_name: mcp-grossrat
+    restart: unless-stopped
+    environment:
+      PORT: "8000"
+      # nginx forwards the bare Host header (no :port), so use an exact match.
+      MCP_ALLOWED_HOSTS: "grossrat.mcp.data.bs.ch"
+    networks:
+      - mcp
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz', timeout=5)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # Opening the index and loading the search model takes longer than a proxy's start.
+      start_period: 60s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grossrat.rule=Host(`grossrat.mcp.data.bs.ch`)"
+      - "traefik.http.routers.grossrat.entrypoints=http"
+      - "traefik.http.services.grossrat.loadbalancer.server.port=8000"

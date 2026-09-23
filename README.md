@@ -7,28 +7,33 @@ client ──HTTPS──> nginx (TLS termination for *.mcp.data.bs.ch)
                        │ proxy_pass (preserves full Host header)
                        ▼
                    Traefik (in-cluster reverse proxy)
-                       │ routes only Host("ogd.mcp.data.bs.ch")
-                       ▼
-                   ogd container (mcp-data-bs, MCP over streamable HTTP)
+                       │ routes by Host header
+          ┌────────────┴─────────────┐
+          ▼                          ▼
+   ogd.mcp.data.bs.ch        grossrat.mcp.data.bs.ch
+   ogd container             grossrat container
+   (mcp-data-bs)             (grossrat-bs-mcp)
 ```
 
 - **nginx** is external to this project: it terminates TLS and forwards every
   `*.mcp.data.bs.ch` request to Traefik. See `nginx-example.conf`.
-- **Traefik** (in this compose) only routes the `ogd.mcp.data.bs.ch` hostname,
-  so other subdomains forwarded by nginx simply get no route (404).
+- **Traefik** (in this compose) only routes the `ogd.mcp.data.bs.ch` and
+  `grossrat.mcp.data.bs.ch` hostnames, so other subdomains forwarded by nginx
+  simply get no route (404).
 
 ## Services
 
 | Service        | Container      | Image                          | Role                                             |
 |----------------|----------------|--------------------------------|--------------------------------------------------|
 | `ogd`          | `mcp-ogd`      | `ghcr.io/dcc-bs/mcp-data-bs`   | MCP server for the data.bs.ch open-data portal    |
-| `reverse-proxy`| `mcp-reverse-proxy` | `traefik:v3.6.1`          | Routes `ogd.mcp.data.bs.ch` to the ogd container |
+| `grossrat`     | `mcp-grossrat` | `ghcr.io/dcc-bs/grossrat-bs-mcp` | MCP server for the Grosser Rat Basel-Stadt: every business item, document and transcript since 1973 |
+| `reverse-proxy`| `mcp-reverse-proxy` | `traefik:v3.6.1`          | Routes each hostname to its container |
 
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `compose.yml` | Defines the Traefik + ogd stack |
+| `compose.yml` | Defines the Traefik + ogd + grossrat stack |
 | `nginx-example.conf` | Example nginx server blocks routing `*.mcp.data.bs.ch` to Traefik |
 | `.env.example` | Template for environment overrides |
 | `.env` | Local overrides (gitignored) |
@@ -62,7 +67,7 @@ docker compose up -d
 Verify:
 
 ```bash
-docker compose ps            # both services Up, ogd healthy
+docker compose ps            # all services Up, ogd and grossrat healthy
 docker compose logs reverse-proxy
 ```
 
@@ -84,7 +89,23 @@ curl -N \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"curl","version":"1.0"}}}' \
   http://localhost:8001/mcp
 # SSE response with serverInfo (name: data.bs.ch)
+
+# 3. The same for the Grosser Rat server
+curl -H "Host: grossrat.mcp.data.bs.ch" http://localhost:8001/healthz
+# {"status":"ok"}
+curl -H "Host: grossrat.mcp.data.bs.ch" http://localhost:8001/health
+# documents, search mode (hybrid) and vector coverage
 ```
+
+## The grossrat image
+
+`ghcr.io/dcc-bs/grossrat-bs-mcp` carries its databases inside (~3.3 GB compressed,
+~10 GB unpacked), so it needs no volume and no model server; the search model runs
+on the CPU in the container. It is built and pushed from the machine that holds the
+data, not by CI (see the grossrat-bs-mcp repository, `mise run deploy:mcp`); a new
+version therefore brings new data. The package is in the dcc-bs organisation, so the
+host needs `docker login ghcr.io` with `read:packages` unless the package is public.
+Update with `docker compose pull grossrat && docker compose up -d grossrat`.
 
 ## Production hostname / allowed hosts
 
@@ -104,6 +125,9 @@ host would be rejected with `421 Invalid Host header`.
 
 - `https://ogd.mcp.data.bs.ch/mcp` → MCP streamable HTTP endpoint
 - `https://ogd.mcp.data.bs.ch/healthz` → liveness check (`{"status":"ok"}`)
+- `https://grossrat.mcp.data.bs.ch/mcp` → MCP streamable HTTP endpoint
+- `https://grossrat.mcp.data.bs.ch/healthz` → liveness check (`{"status":"ok"}`)
+- `https://grossrat.mcp.data.bs.ch/health` → state of the corpus (documents, search mode)
 - `http://localhost:<TRAEFIK_PORT>` → Traefik HTTP entrypoint (for local tests)
 
 ## Troubleshooting
