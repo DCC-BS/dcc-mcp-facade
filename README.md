@@ -8,18 +8,18 @@ client ──HTTPS──> nginx (TLS termination for *.mcp.data.bs.ch)
                        ▼
                    Traefik (in-cluster reverse proxy)
                        │ routes by Host header
-          ┌────────────┴─────────────┐
-          ▼                          ▼
-   ogd.mcp.data.bs.ch        grossrat.mcp.data.bs.ch
-   ogd container             grossrat container
-   (mcp-data-bs)             (grossrat-bs-mcp)
+          ┌────────────┼──────────────────────────┐
+          ▼            ▼                          ▼
+   ogd.mcp.data.bs.ch  grossrat.mcp.data.bs.ch    statistik.mcp.data.bs.ch
+   ogd container       grossrat container         statistik container
+   (mcp-data-bs)       (grossrat-bs-mcp)          (mcp-statistikportal)
 ```
 
 - **nginx** is external to this project: it terminates TLS and forwards every
   `*.mcp.data.bs.ch` request to Traefik. See `nginx-example.conf`.
-- **Traefik** (in this compose) only routes the `ogd.mcp.data.bs.ch` and
-  `grossrat.mcp.data.bs.ch` hostnames, so other subdomains forwarded by nginx
-  simply get no route (404).
+- **Traefik** (in this compose) only routes the `ogd.mcp.data.bs.ch`,
+  `grossrat.mcp.data.bs.ch` and `statistik.mcp.data.bs.ch` hostnames, so other
+  subdomains forwarded by nginx simply get no route (404).
 
 ## Services
 
@@ -27,13 +27,14 @@ client ──HTTPS──> nginx (TLS termination for *.mcp.data.bs.ch)
 |----------------|----------------|--------------------------------|--------------------------------------------------|
 | `ogd`          | `mcp-ogd`      | `ghcr.io/dcc-bs/mcp-data-bs`   | MCP server for the data.bs.ch open-data portal    |
 | `grossrat`     | `mcp-grossrat` | `ghcr.io/dcc-bs/grossrat-bs-mcp` | MCP server for the Grosser Rat Basel-Stadt: every business item, document and transcript since 1973 |
+| `statistik`    | `mcp-statistik` | `ghcr.io/dcc-bs/mcp-statistikportal` | MCP server for the statistics portal statistik.bs.ch: indicator search, metadata and time series |
 | `reverse-proxy`| `mcp-reverse-proxy` | `traefik:v3.6.1`          | Routes each hostname to its container |
 
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `compose.yml` | Defines the Traefik + ogd + grossrat stack |
+| `compose.yml` | Defines the Traefik + ogd + grossrat + statistik stack |
 | `nginx-example.conf` | Example nginx server blocks routing `*.mcp.data.bs.ch` to Traefik |
 | `.env.example` | Template for environment overrides |
 | `.env` | Local overrides (gitignored) |
@@ -67,7 +68,7 @@ docker compose up -d
 Verify:
 
 ```bash
-docker compose ps            # all services Up, ogd and grossrat healthy
+docker compose ps            # all services Up, ogd, grossrat and statistik healthy
 docker compose logs reverse-proxy
 ```
 
@@ -95,6 +96,10 @@ curl -H "Host: grossrat.mcp.data.bs.ch" http://localhost:8001/healthz
 # {"status":"ok"}
 curl -H "Host: grossrat.mcp.data.bs.ch" http://localhost:8001/health
 # documents, search mode (hybrid) and vector coverage
+
+# 4. The same for the statistics portal server
+curl -H "Host: statistik.mcp.data.bs.ch" http://localhost:8001/healthz
+# {"status":"ok"}
 ```
 
 ## The grossrat image
@@ -128,6 +133,8 @@ host would be rejected with `421 Invalid Host header`.
 - `https://grossrat.mcp.data.bs.ch/mcp` → MCP streamable HTTP endpoint
 - `https://grossrat.mcp.data.bs.ch/healthz` → liveness check (`{"status":"ok"}`)
 - `https://grossrat.mcp.data.bs.ch/health` → state of the corpus (documents, search mode)
+- `https://statistik.mcp.data.bs.ch/mcp` → MCP streamable HTTP endpoint
+- `https://statistik.mcp.data.bs.ch/healthz` → liveness check (`{"status":"ok"}`)
 - `http://localhost:<TRAEFIK_PORT>` → Traefik HTTP entrypoint (for local tests)
 
 ## Troubleshooting
@@ -139,8 +146,8 @@ Use Traefik `v3.6.1`+ (already pinned in this project).
 `MCP_ALLOWED_HOSTS`. Verify nginx forwards the bare host and that
 `MCP_ALLOWED_HOSTS` is the exact hostname (see above).
 
-**`404 page not found`** from Traefik — the hostname isn't routed. Only
-`ogd.mcp.data.bs.ch` is routed; confirm the `Host` header matches and that
+**`404 page not found`** from Traefik — the hostname isn't routed. Only the
+hostnames listed under Endpoints are routed; confirm the `Host` header matches and that
 Traefik has picked up the router (`curl -H "Host: ogd.mcp.data.bs.ch" http://localhost:8001/healthz`).
 
 **Traefik cannot connect to the Docker daemon** — the `DOCKER_SOCKET` in

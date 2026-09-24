@@ -69,3 +69,28 @@ services:
       - "traefik.http.routers.grossrat.rule=Host(`grossrat.mcp.data.bs.ch`)"
       - "traefik.http.routers.grossrat.entrypoints=http"
       - "traefik.http.services.grossrat.loadbalancer.server.port=8000"
+
+  statistik:
+    # Indicators of the Statistisches Amt Basel-Stadt (statistik.bs.ch): search,
+    # metadata and time series. Stateless; reads the public portal API.
+    image: ghcr.io/dcc-bs/mcp-statistikportal:latest
+    container_name: mcp-statistik
+    restart: unless-stopped
+    environment:
+      STATISTIK_PORTAL_DOMAIN: statistik.bs.ch
+      PORT: "8000"
+      # nginx forwards the bare Host header (no :port), so use an exact match.
+      MCP_ALLOWED_HOSTS: "statistik.mcp.data.bs.ch"
+    networks:
+      - mcp
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz', timeout=5)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.statistik.rule=Host(`statistik.mcp.data.bs.ch`)"
+      - "traefik.http.routers.statistik.entrypoints=http"
+      - "traefik.http.services.statistik.loadbalancer.server.port=8000"
