@@ -1,25 +1,25 @@
 # dcc-mcp-facade
 
-Reverse-proxy facade that exposes MCP servers behind a single host. Request flow:
+Reverse-proxy facade that exposes MCP servers behind hostname-based routing. Request flow:
 
 ```
-client ──HTTPS──> nginx (TLS termination for *.mcp.data.bs.ch)
+client ──HTTPS──> nginx (TLS termination)
                        │ proxy_pass (preserves full Host header)
                        ▼
                    Traefik (in-cluster reverse proxy)
                        │ routes by Host header
           ┌────────────┼──────────────────────────┐
           ▼            ▼                          ▼
-   ogd.mcp.data.bs.ch  grossrat.mcp.data.bs.ch    statistik.mcp.data.bs.ch
-   ogd container       grossrat container         statistik container
-   (mcp-data-bs)       (grossrat-bs-mcp)          (mcp-statistikportal)
+   mcp.data.bs.ch  mcp-grosserrat.statistik.bs.ch  mcp.statistik.bs.ch
+   ogd container   grossrat container              statistik container
+   (mcp-data-bs)   (grossrat-bs-mcp)               (mcp-statistikportal)
 ```
 
-- **nginx** is external to this project: it terminates TLS and forwards every
-  `*.mcp.data.bs.ch` request to Traefik. See `nginx-example.conf`.
-- **Traefik** (in this compose) only routes the `ogd.mcp.data.bs.ch`,
-  `grossrat.mcp.data.bs.ch` and `statistik.mcp.data.bs.ch` hostnames, so other
-  subdomains forwarded by nginx simply get no route (404).
+- **nginx** is external to this project: it terminates TLS and forwards the
+  MCP hostnames to Traefik. See `nginx-example.conf`.
+- **Traefik** (in this compose) only routes `mcp.data.bs.ch`,
+  `mcp-grosserrat.statistik.bs.ch` and `mcp.statistik.bs.ch`, so other
+  hostnames forwarded by nginx simply get no route (404).
 
 ## Services
 
@@ -35,7 +35,7 @@ client ──HTTPS──> nginx (TLS termination for *.mcp.data.bs.ch)
 | File | Purpose |
 |------|---------|
 | `compose.yml` | Defines the Traefik + ogd + grossrat + statistik stack |
-| `nginx-example.conf` | Example nginx server blocks routing `*.mcp.data.bs.ch` to Traefik |
+| `nginx-example.conf` | Example nginx server blocks routing the MCP hostnames to Traefik |
 | `.env.example` | Template for environment overrides |
 | `.env` | Local overrides (gitignored) |
 
@@ -79,12 +79,12 @@ manually to Traefik's published port (`localhost:8001`):
 
 ```bash
 # 1. Health check
-curl -H "Host: ogd.mcp.data.bs.ch" http://localhost:8001/healthz
+curl -H "Host: mcp.data.bs.ch" http://localhost:8001/healthz
 # {"status":"ok"}
 
 # 2. MCP initialize — the real test
 curl -N \
-  -H "Host: ogd.mcp.data.bs.ch" \
+  -H "Host: mcp.data.bs.ch" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"curl","version":"1.0"}}}' \
@@ -92,13 +92,13 @@ curl -N \
 # SSE response with serverInfo (name: data.bs.ch)
 
 # 3. The same for the Grosser Rat server
-curl -H "Host: grossrat.mcp.data.bs.ch" http://localhost:8001/healthz
+curl -H "Host: mcp-grosserrat.statistik.bs.ch" http://localhost:8001/healthz
 # {"status":"ok"}
-curl -H "Host: grossrat.mcp.data.bs.ch" http://localhost:8001/health
+curl -H "Host: mcp-grosserrat.statistik.bs.ch" http://localhost:8001/health
 # documents, search mode (hybrid) and vector coverage
 
 # 4. The same for the statistics portal server
-curl -H "Host: statistik.mcp.data.bs.ch" http://localhost:8001/healthz
+curl -H "Host: mcp.statistik.bs.ch" http://localhost:8001/healthz
 # {"status":"ok"}
 ```
 
@@ -115,26 +115,26 @@ Update with `docker compose pull grossrat && docker compose up -d grossrat`.
 ## Production hostname / allowed hosts
 
 `MCP_ALLOWED_HOSTS` is the app's DNS-rebinding `Host`-header allowlist.
-nginx forwards a **bare** Host header (e.g. `Host: ogd.mcp.data.bs.ch`, no
+nginx forwards a **bare** Host header (e.g. `Host: mcp.data.bs.ch`, no
 port). It must therefore be an **exact match**:
 
 ```yaml
-MCP_ALLOWED_HOSTS: "ogd.mcp.data.bs.ch"   # correct for nginx in front
+MCP_ALLOWED_HOSTS: "mcp.data.bs.ch"   # correct for nginx in front
 ```
 
-Do **not** use the `*:port` wildcard form (`ogd.mcp.data.bs.ch:*`) behind
+Do **not** use the `*:port` wildcard form (`mcp.data.bs.ch:*`) behind
 nginx: that pattern only matches a Host header that includes a port, so a bare
 host would be rejected with `421 Invalid Host header`.
 
 ## Endpoints
 
-- `https://ogd.mcp.data.bs.ch/mcp` → MCP streamable HTTP endpoint
-- `https://ogd.mcp.data.bs.ch/healthz` → liveness check (`{"status":"ok"}`)
-- `https://grossrat.mcp.data.bs.ch/mcp` → MCP streamable HTTP endpoint
-- `https://grossrat.mcp.data.bs.ch/healthz` → liveness check (`{"status":"ok"}`)
-- `https://grossrat.mcp.data.bs.ch/health` → state of the corpus (documents, search mode)
-- `https://statistik.mcp.data.bs.ch/mcp` → MCP streamable HTTP endpoint
-- `https://statistik.mcp.data.bs.ch/healthz` → liveness check (`{"status":"ok"}`)
+- `https://mcp.data.bs.ch/mcp` → MCP streamable HTTP endpoint
+- `https://mcp.data.bs.ch/healthz` → liveness check (`{"status":"ok"}`)
+- `https://mcp-grosserrat.statistik.bs.ch/mcp` → MCP streamable HTTP endpoint
+- `https://mcp-grosserrat.statistik.bs.ch/healthz` → liveness check (`{"status":"ok"}`)
+- `https://mcp-grosserrat.statistik.bs.ch/health` → state of the corpus (documents, search mode)
+- `https://mcp.statistik.bs.ch/mcp` → MCP streamable HTTP endpoint
+- `https://mcp.statistik.bs.ch/healthz` → liveness check (`{"status":"ok"}`)
 - `http://localhost:<TRAEFIK_PORT>` → Traefik HTTP entrypoint (for local tests)
 
 ## Troubleshooting
@@ -148,7 +148,7 @@ Use Traefik `v3.6.1`+ (already pinned in this project).
 
 **`404 page not found`** from Traefik — the hostname isn't routed. Only the
 hostnames listed under Endpoints are routed; confirm the `Host` header matches and that
-Traefik has picked up the router (`curl -H "Host: ogd.mcp.data.bs.ch" http://localhost:8001/healthz`).
+Traefik has picked up the router (`curl -H "Host: mcp.data.bs.ch" http://localhost:8001/healthz`).
 
 **Traefik cannot connect to the Docker daemon** — the `DOCKER_SOCKET` in
 `.env` is wrong. Run `docker context ls` to find the daemon socket path.

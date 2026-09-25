@@ -30,7 +30,7 @@ services:
       PORT: "8000"
       # nginx forwards the bare Host header (no :port), so use an exact match.
       # A "*:port" wildcard only matches a Host WITH a port and would 421 here.
-      MCP_ALLOWED_HOSTS: "ogd.mcp.data.bs.ch"
+      MCP_ALLOWED_HOSTS: "mcp.data.bs.ch"
     networks:
       - mcp
     healthcheck:
@@ -41,7 +41,7 @@ services:
       start_period: 10s
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.ogd.rule=Host(`ogd.mcp.data.bs.ch`)"
+      - "traefik.http.routers.ogd.rule=Host(`mcp.data.bs.ch`)"
       - "traefik.http.routers.ogd.entrypoints=http"
       - "traefik.http.services.ogd.loadbalancer.server.port=8000"
 
@@ -54,7 +54,7 @@ services:
     environment:
       PORT: "8000"
       # nginx forwards the bare Host header (no :port), so use an exact match.
-      MCP_ALLOWED_HOSTS: "grossrat.mcp.data.bs.ch"
+      MCP_ALLOWED_HOSTS: "mcp-grosserrat.statistik.bs.ch"
     networks:
       - mcp
     healthcheck:
@@ -66,7 +66,7 @@ services:
       start_period: 60s
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.grossrat.rule=Host(`grossrat.mcp.data.bs.ch`)"
+      - "traefik.http.routers.grossrat.rule=Host(`mcp-grosserrat.statistik.bs.ch`)"
       - "traefik.http.routers.grossrat.entrypoints=http"
       - "traefik.http.services.grossrat.loadbalancer.server.port=8000"
 
@@ -80,7 +80,7 @@ services:
       STATISTIK_PORTAL_DOMAIN: statistik.bs.ch
       PORT: "8000"
       # nginx forwards the bare Host header (no :port), so use an exact match.
-      MCP_ALLOWED_HOSTS: "statistik.mcp.data.bs.ch"
+      MCP_ALLOWED_HOSTS: "mcp.statistik.bs.ch"
     networks:
       - mcp
     healthcheck:
@@ -91,6 +91,6 @@ services:
       start_period: 10s
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.statistik.rule=Host(`statistik.mcp.data.bs.ch`)"
+      - "traefik.http.routers.statistik.rule=Host(`mcp.statistik.bs.ch`)"
       - "traefik.http.routers.statistik.entrypoints=http"
       - "traefik.http.services.statistik.loadbalancer.server.port=8000"
