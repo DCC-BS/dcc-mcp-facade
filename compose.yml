@@ -72,7 +72,8 @@ services:
 
   statistik:
     # Indicators of the Statistisches Amt Basel-Stadt (statistik.bs.ch): search,
-    # metadata and time series. Stateless; reads the public portal API.
+    # metadata and time series, plus web tables. Stateless; reads the public
+    # portal API.
     image: ghcr.io/dcc-bs/mcp-statistikportal:latest
     container_name: mcp-statistik
     restart: unless-stopped
