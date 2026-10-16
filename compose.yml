@@ -79,6 +79,9 @@ services:
     restart: unless-stopped
     environment:
       STATISTIK_PORTAL_DOMAIN: statistik.bs.ch
+      # Inside the network the portal only answers on port 80; links in tool
+      # results stay https://statistik.bs.ch.
+      STATISTIK_PORTAL_API_URL: http://statistik.bs.ch
       PORT: "8000"
       # nginx forwards the bare Host header (no :port), so use an exact match.
       MCP_ALLOWED_HOSTS: "mcp.statistik.bs.ch"
