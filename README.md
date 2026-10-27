@@ -28,7 +28,7 @@ client ──HTTPS──> nginx (TLS termination)
 | `ogd`          | `mcp-ogd`      | `ghcr.io/dcc-bs/mcp-data-bs`   | MCP server for the data.bs.ch open-data portal    |
 | `grossrat`     | `mcp-grossrat` | `ghcr.io/dcc-bs/grossrat-bs-mcp` | MCP server for the Grosser Rat Basel-Stadt: every business item, document and transcript since 1973 |
 | `statistik`    | `mcp-statistik` | `ghcr.io/dcc-bs/mcp-statistikportal` | MCP server for the statistics portal statistik.bs.ch: indicator search, metadata and time series, plus web tables |
-| `reverse-proxy`| `mcp-reverse-proxy` | `traefik:v3.6.1`          | Routes each hostname to its container |
+| `reverse-proxy`| `mcp-reverse-proxy` | `traefik:v3.7.16`         | Routes each hostname to its container |
 
 ## Files
 
