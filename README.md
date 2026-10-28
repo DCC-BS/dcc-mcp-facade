@@ -8,33 +8,35 @@ client ──HTTPS──> nginx (TLS termination)
                        ▼
                    Traefik (in-cluster reverse proxy)
                        │ routes by Host header
-          ┌────────────┼──────────────────────────┐
-          ▼            ▼                          ▼
-   mcp.data.bs.ch  mcp-grosserrat.statistik.bs.ch  mcp.statistik.bs.ch
-   ogd container   grossrat container              statistik container
-   (mcp-data-bs)   (grossrat-bs-mcp)               (mcp-statistikportal)
+          ┌────────────┼──────────────────────────┬────────────────────────────────────────┐
+          ▼            ▼                          ▼                                        ▼
+   mcp.data.bs.ch  mcp-grosserrat.statistik.bs.ch  mcp.statistik.bs.ch   mcp-medienmitteilungen.statistik.bs.ch
+   ogd container   grossrat container              statistik container   medienmitteilungen container
+   (mcp-data-bs)   (grossrat-bs-mcp)               (mcp-statistikportal) (mcp-medienmitteilungen)
 ```
 
 - **nginx** is external to this project: it terminates TLS and forwards the
   MCP hostnames to Traefik. See `nginx-example.conf`.
 - **Traefik** (in this compose) only routes `mcp.data.bs.ch`,
-  `mcp-grosserrat.statistik.bs.ch` and `mcp.statistik.bs.ch`, so other
+  `mcp-grosserrat.statistik.bs.ch`, `mcp.statistik.bs.ch` and
+  `mcp-medienmitteilungen.statistik.bs.ch`, so other
   hostnames forwarded by nginx simply get no route (404).
 
 ## Services
 
-| Service        | Container      | Image                          | Role                                             |
-|----------------|----------------|--------------------------------|--------------------------------------------------|
-| `ogd`          | `mcp-ogd`      | `ghcr.io/dcc-bs/mcp-data-bs`   | MCP server for the data.bs.ch open-data portal    |
-| `grossrat`     | `mcp-grossrat` | `ghcr.io/dcc-bs/grossrat-bs-mcp` | MCP server for the Grosser Rat Basel-Stadt: every business item, document and transcript since 1973 |
-| `statistik`    | `mcp-statistik` | `ghcr.io/dcc-bs/mcp-statistikportal` | MCP server for the statistics portal statistik.bs.ch: indicator search, metadata and time series, plus web tables |
-| `reverse-proxy`| `mcp-reverse-proxy` | `traefik:v3.6.1`          | Routes each hostname to its container |
+| Service              | Container                | Image                                    | Role                                             |
+|----------------------|--------------------------|------------------------------------------|--------------------------------------------------|
+| `ogd`                | `mcp-ogd`                | `ghcr.io/dcc-bs/mcp-data-bs`             | MCP server for the data.bs.ch open-data portal    |
+| `grossrat`           | `mcp-grossrat`           | `ghcr.io/dcc-bs/grossrat-bs-mcp`         | MCP server for the Grosser Rat Basel-Stadt: every business item, document and transcript since 1973 |
+| `statistik`          | `mcp-statistik`          | `ghcr.io/dcc-bs/mcp-statistikportal`     | MCP server for the statistics portal statistik.bs.ch: indicator search, metadata and time series, plus web tables |
+| `medienmitteilungen` | `mcp-medienmitteilungen` | `ghcr.io/dcc-bs/mcp-medienmitteilungen`  | MCP server for the press releases (Medienmitteilungen) of Basel-Stadt on www.bs.ch |
+| `reverse-proxy`      | `mcp-reverse-proxy`      | `traefik:v3.6.1`                         | Routes each hostname to its container |
 
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `compose.yml` | Defines the Traefik + ogd + grossrat + statistik stack |
+| `compose.yml` | Defines the Traefik + ogd + grossrat + statistik + medienmitteilungen stack |
 | `nginx-example.conf` | Example nginx server blocks routing the MCP hostnames to Traefik |
 | `.env.example` | Template for environment overrides |
 | `.env` | Local overrides (gitignored) |
@@ -100,6 +102,10 @@ curl -H "Host: mcp-grosserrat.statistik.bs.ch" http://localhost:8001/health
 # 4. The same for the statistics portal server
 curl -H "Host: mcp.statistik.bs.ch" http://localhost:8001/healthz
 # {"status":"ok"}
+
+# 5. The same for the press releases server
+curl -H "Host: mcp-medienmitteilungen.statistik.bs.ch" http://localhost:8001/healthz
+# {"status":"ok"}
 ```
 
 ## The grossrat image
@@ -135,6 +141,8 @@ host would be rejected with `421 Invalid Host header`.
 - `https://mcp-grosserrat.statistik.bs.ch/health` → state of the corpus (documents, search mode)
 - `https://mcp.statistik.bs.ch/mcp` → MCP streamable HTTP endpoint
 - `https://mcp.statistik.bs.ch/healthz` → liveness check (`{"status":"ok"}`)
+- `https://mcp-medienmitteilungen.statistik.bs.ch/mcp` → MCP streamable HTTP endpoint
+- `https://mcp-medienmitteilungen.statistik.bs.ch/healthz` → liveness check (`{"status":"ok"}`)
 - `http://localhost:<TRAEFIK_PORT>` → Traefik HTTP entrypoint (for local tests)
 
 ## Troubleshooting
