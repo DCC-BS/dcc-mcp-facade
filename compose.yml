@@ -98,3 +98,29 @@ services:
       - "traefik.http.routers.statistik.rule=Host(`mcp.statistik.bs.ch`)"
       - "traefik.http.routers.statistik.entrypoints=http"
       - "traefik.http.services.statistik.loadbalancer.server.port=8000"
+
+  medienmitteilungen:
+    # Press releases (Medienmitteilungen) of the canton of Basel-Stadt (www.bs.ch):
+    # search, organization facets and full article text/attachments. Stateless;
+    # reads the public www.bs.ch search and GraphQL endpoints.
+    image: ghcr.io/dcc-bs/mcp-medienmitteilungen:latest
+    container_name: mcp-medienmitteilungen
+    restart: unless-stopped
+    environment:
+      BS_DOMAIN: www.bs.ch
+      PORT: "8000"
+      # nginx forwards the bare Host header (no :port), so use an exact match.
+      MCP_ALLOWED_HOSTS: "mcp-medienmitteilungen.statistik.bs.ch"
+    networks:
+      - mcp
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz', timeout=5)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.medienmitteilungen.rule=Host(`mcp-medienmitteilungen.statistik.bs.ch`)"
+      - "traefik.http.routers.medienmitteilungen.entrypoints=http"
+      - "traefik.http.services.medienmitteilungen.loadbalancer.server.port=8000"
