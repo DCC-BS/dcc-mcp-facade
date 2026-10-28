@@ -30,7 +30,7 @@ client ──HTTPS──> nginx (TLS termination)
 | `grossrat`           | `mcp-grossrat`           | `ghcr.io/dcc-bs/grossrat-bs-mcp`         | MCP server for the Grosser Rat Basel-Stadt: every business item, document and transcript since 1973 |
 | `statistik`          | `mcp-statistik`          | `ghcr.io/dcc-bs/mcp-statistikportal`     | MCP server for the statistics portal statistik.bs.ch: indicator search, metadata and time series, plus web tables |
 | `medienmitteilungen` | `mcp-medienmitteilungen` | `ghcr.io/dcc-bs/mcp-medienmitteilungen`  | MCP server for the press releases (Medienmitteilungen) of Basel-Stadt on www.bs.ch |
-| `reverse-proxy`      | `mcp-reverse-proxy`      | `traefik:v3.6.1`                         | Routes each hostname to its container |
+| `reverse-proxy`      | `mcp-reverse-proxy`      | `traefik:v3.7.16`                        | Routes each hostname to its container |
 
 ## Files
 

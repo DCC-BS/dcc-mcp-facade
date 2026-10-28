@@ -4,7 +4,7 @@ networks:
 
 services:
   reverse-proxy:
-    image: traefik:v3.6.1
+    image: traefik:v3.7.16
     container_name: mcp-reverse-proxy
     restart: unless-stopped
     command:
